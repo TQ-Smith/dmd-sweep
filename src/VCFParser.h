@@ -5,8 +5,8 @@
 // Principal Investigator: Dr. Zachary A. Szpiech
 // Purpose: Adapted from EGGS.
 
-#ifndef VCF_PARSER_H
-#define VCF_PARSER_H
+#ifndef _VCF_PARSER_H
+#define _VCF_PARSER_H
 
 #include <stdbool.h>
 #include "kseq.h"
