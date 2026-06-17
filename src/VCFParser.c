@@ -66,70 +66,98 @@ VCF_t* init_vcf(InputStream_t* inputStream, bool eat) {
     return vcf;
 }
 
-bool get_next_vcf_record(Record_t* record, InputStream_t* inputStream) {
+bool get_next_vcf_record(Record_t* record, InputStream_t* inputStream, bool dropMonomorphicSites, double maf, double afMissing) {
 
     int dret = 0, numTabs = 0, prevIndex = 0, numAlleles = 2;
 
-    // Get the next line.
-    ks_getuntil(inputStream -> fpIn, '\n', inputStream -> buffer, &dret);
+    while (true) {
+        // Get the next line.
+        ks_getuntil(inputStream -> fpIn, '\n', inputStream -> buffer, &dret);
 
-    // If end of file, return false.
-    if (ks_eof(inputStream -> fpIn) || inputStream -> buffer -> l == 0)
-        return false;
+        // If end of file, return false.
+        if (ks_eof(inputStream -> fpIn) || inputStream -> buffer -> l == 0)
+            return false;
 
-    // This is alittle clunky, but I think it is faster than splitting on '\t'.
-    for (int i = 0; i <= inputStream -> buffer -> l; i++) {
-        // If end of the line is reached or a tab was encountered.
-        if (i == inputStream -> buffer -> l || inputStream -> buffer -> s[i] == '\t') {
-            if (numTabs == 0) {
-                // The first field in a record is the chromosome name.
-                if (record -> chrom != NULL)
-                    free(record -> chrom);
-                record -> chrom = strndup(inputStream -> buffer -> s, i);
-            } else if (numTabs == 1) {
-                // The second field is the position on the chromosome.
-                record -> position = (int) strtol(inputStream -> buffer -> s + prevIndex + 1, (char**) NULL, 10);
-            } else if (numTabs == 4) {
-                // The fifth field holds the ALT alleles. Each record has at least two alleles.
-                //  Each additional allele is appended withinputStream -> buffer -> s a ','. For each ',' encountered,
-                //  increment the number of alleles in the record.
-                for (int j = prevIndex + 1; inputStream -> buffer -> s[j] != '\t'; j++)
-                    if (inputStream -> buffer -> s[j] == ',')
-                        numAlleles++;
-            } else if (numTabs > 8) {
-                Genotype_t temp;
-                temp.left = MISSING;
-                temp.right = MISSING;
-                temp.isPhased = false;
-                char* start = inputStream -> buffer -> s + prevIndex + 1;
-                char* next = start;
-                if (start[0] != '.')
-                    temp.left = (int) strtol(start, &next, 10);
-                if (next[0] == '|') 
-                    temp.isPhased = true;
-                if ((next[0] == '|' || next[0] == '/') && next[1] != '.')
-                    temp.right = (int) strtol(next + 1, (char**) NULL, 10);
-                
-                int sampleIndex = numTabs - 9;
-                record -> genotypes[sampleIndex].left = temp.left;
-                record -> genotypes[sampleIndex].right = temp.right;
-                record -> genotypes[sampleIndex].isPhased = temp.isPhased;
+        // This is alittle clunky, but I think it is faster than splitting on '\t'.
+        for (int i = 0; i <= inputStream -> buffer -> l; i++) {
+            // If end of the line is reached or a tab was encountered.
+            if (i == inputStream -> buffer -> l || inputStream -> buffer -> s[i] == '\t') {
+                if (numTabs == 0) {
+                    // The first field in a record is the chromosome name.
+                    if (record -> chrom != NULL)
+                        free(record -> chrom);
+                    record -> chrom = strndup(inputStream -> buffer -> s, i);
+                } else if (numTabs == 1) {
+                    // The second field is the position on the chromosome.
+                    record -> position = (int) strtol(inputStream -> buffer -> s + prevIndex + 1, (char**) NULL, 10);
+                } else if (numTabs == 4) {
+                    // The fifth field holds the ALT alleles. Each record has at least two alleles.
+                    //  Each additional allele is appended withinputStream -> buffer -> s a ','. For each ',' encountered,
+                    //  increment the number of alleles in the record.
+                    for (int j = prevIndex + 1; inputStream -> buffer -> s[j] != '\t'; j++)
+                        if (inputStream -> buffer -> s[j] == ',')
+                            numAlleles++;
+                } else if (numTabs > 8) {
+                    Genotype_t temp;
+                    temp.left = MISSING;
+                    temp.right = MISSING;
+                    temp.isPhased = false;
+                    char* start = inputStream -> buffer -> s + prevIndex + 1;
+                    char* next = start;
+                    if (start[0] != '.')
+                        temp.left = (int) strtol(start, &next, 10);
+                    if (next[0] == '|') 
+                        temp.isPhased = true;
+                    if ((next[0] == '|' || next[0] == '/') && next[1] != '.')
+                        temp.right = (int) strtol(next + 1, (char**) NULL, 10);
+                    
+                    int sampleIndex = numTabs - 9;
+                    record -> genotypes[sampleIndex].left = temp.left;
+                    record -> genotypes[sampleIndex].right = temp.right;
+                    record -> genotypes[sampleIndex].isPhased = temp.isPhased;
+                }
+                prevIndex = i;
+                numTabs++;
             }
-            prevIndex = i;
-            numTabs++;
         }
+        record -> numAlleles = numAlleles;
+
+        // Only consider biallelic sites.
+        if (numAlleles != 2)
+            continue;
+
+        int numAlts = 0, numMissing = 0;
+        for (int i = 0; i < record -> numSamples; i++) {
+            if (record -> genotypes[i].left == 1)
+                numAlts++;
+            if (record -> genotypes[i].right == 1)
+                numAlts++;
+            if (record -> genotypes[i].left == -1)
+                numMissing++;
+            if (record -> genotypes[i].right == -1)
+                numMissing++;
+        }
+
+        // Drop site if monomorphic.
+        if (dropMonomorphicSites && numMissing == 0 && (numAlts == record -> numSamples || numAlts == 0))
+            continue;
+
+        // MAF and missing threshold.
+        if (numAlleles / ((double) 2 * record -> numSamples) < maf)
+            continue;
+        if (numMissing / ((double) 2 * record -> numSamples) < afMissing)
+            continue;
+
+        break;
     }
-    record -> numAlleles = numAlleles;
 
     // Successfully parsed record.
     return true;
-
 }
 
-void parse_vcf(VCF_t* vcf, InputStream_t* inputStream, bool keep, bool hap) {
+void parse_vcf(VCF_t* vcf, InputStream_t* inputStream, bool dropMonomorphicSites, double maf, double afMissing) {
     int recordIndex = 0;
     while (true) {
-
         // Allocate memory for a new record.
         Record_t* record = (Record_t*) calloc(1, sizeof(Record_t));
         record -> genotypes = (Genotype_t*) calloc(vcf -> numSamples, sizeof(Genotype_t));
@@ -137,7 +165,7 @@ void parse_vcf(VCF_t* vcf, InputStream_t* inputStream, bool keep, bool hap) {
         record -> recordIndex = recordIndex;
 
         // While not EOF, add record to the list.
-        if (get_next_vcf_record(record, inputStream)) {
+        if (get_next_vcf_record(record, inputStream, dropMonomorphicSites, maf, afMissing)) {
             if (vcf -> numRecords == 0) {
                 vcf -> headRecord = record;
                 vcf -> tailRecord = record;

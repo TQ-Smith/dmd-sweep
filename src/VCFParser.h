@@ -90,8 +90,11 @@ VCF_t* init_vcf(InputStream_t* inputStream, bool eat);
 // Accepts:
 //  Record_t* record -> An allocated record. Set fields.
 //  InputStream_t* inputStream -> The VCF file we are reading.
+//  bool dropMonomorphicSites -> Drop sites if monomorphic.
+//  double maf -> Minor allele frequency threshold.
+//  double afMissing -> Missing allele frequency threshold.
 // Returns: bool, true is a record was read. false, if eof.
-bool get_next_vcf_record(Record_t* record, InputStream_t* inputStream);
+bool get_next_vcf_record(Record_t* record, InputStream_t* inputStream, bool dropMonomorphicSites, double maf, double afMissing);
 
 // Reads in whole VCF file and adds each record to VCF.
 // Accepts:
