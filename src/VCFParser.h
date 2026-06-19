@@ -9,9 +9,10 @@
 #define _VCF_PARSER_H
 
 #include <stdbool.h>
-#include "kseq.h"
 #include <zlib.h>
 #include <stdio.h>
+#include "kseq.h"
+#include "BitSet.h"
 
 // We use -1 to denote a missing genotype.
 #define MISSING -1
@@ -19,15 +20,6 @@
 // A stream to read GZIP files.
 #define BUFFER_SIZE 4096
 KSTREAM_INIT(gzFile, gzread, BUFFER_SIZE)
-
-// Represents the genotype of a sample at a locus.
-typedef struct {
-    // If the genotype is phased.
-    bool isPhased;
-    // The left and right genotypes.
-    int left;
-    int right;
-} Genotype_t;
 
 // Represents a record/locus.
 typedef struct Record {
@@ -41,8 +33,11 @@ typedef struct Record {
     int numSamples;
     // The index of the record in the list.
     int recordIndex;
-    // The genotypes for each sample.
-    Genotype_t* genotypes;
+    // Genotype information.
+    BitSet_t* left;
+    BitSet_t* right;
+    BitSet_t* leftMissing;
+    BitSet_t* rightMissing;
     // A pointer to the next locus. Record_t is a node in a linked list.
     struct Record* nextRecord;
 } Record_t;

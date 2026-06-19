@@ -98,23 +98,15 @@ bool get_next_vcf_record(Record_t* record, InputStream_t* inputStream, bool drop
                         if (inputStream -> buffer -> s[j] == ',')
                             numAlleles++;
                 } else if (numTabs > 8) {
-                    Genotype_t temp;
-                    temp.left = MISSING;
-                    temp.right = MISSING;
-                    temp.isPhased = false;
+                    int sampleIndex = numTabs - 9;
+                    set_bit(record -> leftMissing, sampleIndex);
+                    set_bit(record -> rightMissing, sampleIndex);
                     char* start = inputStream -> buffer -> s + prevIndex + 1;
                     char* next = start;
                     if (start[0] != '.')
-                        temp.left = (int) strtol(start, &next, 10);
-                    if (next[0] == '|') 
-                        temp.isPhased = true;
+                        set_bit(record -> left, sampleIndex);
                     if ((next[0] == '|' || next[0] == '/') && next[1] != '.')
-                        temp.right = (int) strtol(next + 1, (char**) NULL, 10);
-                    
-                    int sampleIndex = numTabs - 9;
-                    record -> genotypes[sampleIndex].left = temp.left;
-                    record -> genotypes[sampleIndex].right = temp.right;
-                    record -> genotypes[sampleIndex].isPhased = temp.isPhased;
+                        set_bit(record -> right, sampleIndex);
                 }
                 prevIndex = i;
                 numTabs++;
@@ -126,17 +118,8 @@ bool get_next_vcf_record(Record_t* record, InputStream_t* inputStream, bool drop
         if (numAlleles != 2)
             continue;
 
-        int numAlts = 0, numMissing = 0;
-        for (int i = 0; i < record -> numSamples; i++) {
-            if (record -> genotypes[i].left == 1)
-                numAlts++;
-            if (record -> genotypes[i].right == 1)
-                numAlts++;
-            if (record -> genotypes[i].left == -1)
-                numMissing++;
-            if (record -> genotypes[i].right == -1)
-                numMissing++;
-        }
+        int numAlts = count_1s(record -> left) +  count_1s(record -> right);
+        int numMissing = count_1s(record -> leftMissing) +  count_1s(record -> rightMissing);
 
         // Drop site if monomorphic.
         if (dropMonomorphicSites && numMissing == 0 && (numAlts == record -> numSamples || numAlts == 0))
@@ -160,7 +143,10 @@ void parse_vcf(VCF_t* vcf, InputStream_t* inputStream, bool dropMonomorphicSites
     while (true) {
         // Allocate memory for a new record.
         Record_t* record = (Record_t*) calloc(1, sizeof(Record_t));
-        record -> genotypes = (Genotype_t*) calloc(vcf -> numSamples, sizeof(Genotype_t));
+        record -> left = init_bitset(vcf -> numSamples);
+        record -> right = init_bitset(vcf -> numSamples);
+        record -> leftMissing = init_bitset(vcf -> numSamples);
+        record -> rightMissing = init_bitset(vcf -> numSamples);
         record -> numSamples = vcf -> numSamples;
         record -> recordIndex = recordIndex;
 
@@ -186,8 +172,14 @@ void parse_vcf(VCF_t* vcf, InputStream_t* inputStream, bool dropMonomorphicSites
 void destroy_record(Record_t* record) {
     if (record == NULL)
         return;
-    if (record -> genotypes != NULL)
-        free(record -> genotypes);
+    if (record -> left != NULL)
+        destroy_bitset(record -> left);
+    if (record -> right != NULL)
+        destroy_bitset(record -> right);
+    if (record -> leftMissing != NULL)
+        destroy_bitset(record -> leftMissing);
+    if (record -> rightMissing != NULL)
+        destroy_bitset(record -> rightMissing);
     if (record -> chrom != NULL)
         free(record -> chrom);
     free(record);
