@@ -156,6 +156,7 @@ void parse_vcf(VCF_t* vcf, InputStream_t* inputStream, bool dropMonomorphicSites
                 vcf -> headRecord = record;
                 vcf -> tailRecord = record;
             } else {
+                record -> prevRecord = vcf -> tailRecord;
                 vcf -> tailRecord -> nextRecord = record;
                 vcf -> tailRecord = record;
             }

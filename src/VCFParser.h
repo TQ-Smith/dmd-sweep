@@ -38,8 +38,9 @@ typedef struct Record {
     BitSet_t* right;
     BitSet_t* leftMissing;
     BitSet_t* rightMissing;
-    // A pointer to the next locus. Record_t is a node in a linked list.
+    // Record_t is a node in a doubly linked list.
     struct Record* nextRecord;
+    struct Record* prevRecord;
 } Record_t;
 
 
