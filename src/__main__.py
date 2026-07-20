@@ -21,7 +21,7 @@ Usage: soap [options] <step1.vcf.gz> <step2.vcf.gz> ...
 Options:
     -k,--dimension         INT         Perform DMD in INT dimensions.
     -g,--garud             INT         Calculate Garud's H statistics on haplotypes of
-                                            INT loci. Cannot be used with --ihs.
+                                            INT base pairs. Cannot be used with --ihs.
     -e,--ihs                           Calculate iHS at each position instead of allele frequency.
                                             Cannot be used with --garud.
     -u,--unphased                      Use unphased versions of Garud's H (G) or unphased iHS.
