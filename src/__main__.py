@@ -9,6 +9,7 @@ import argparse
 import sys
 import os
 from multiprocessing import Pool
+import stats
 
 def print_help() -> None:
     print("""
@@ -20,8 +21,10 @@ Usage: soap [options] <step1.vcf.gz> <step2.vcf.gz> ...
 
 Options:
     -k,--dimension         INT         Perform DMD in INT dimensions.
+                                            Default 2.
     -g,--garud             INT         Calculate Garud's H statistics on haplotypes of
                                             INT base pairs. Cannot be used with --ihs.
+                                            Default 40000.
     -e,--ihs                           Calculate iHS at each position instead of allele frequency.
                                             Cannot be used with --garud.
     -u,--unphased                      Use unphased versions of Garud's H (G) or unphased iHS.
@@ -33,7 +36,7 @@ Options:
     -m,--MAF               DOUBLE      Biallelic sites with MAF <= DOUBLE are dropped.
                                             Default 0; monomorphic sites are dropped.
     -n,--missingAF         DOUBLE      Sites with proportion of missing genotypes >= DOUBLE are dropped.
-                                            Default 1; no sites with missing genotypes are dropped.
+                                            Default 1; sites with all missing genotypes are dropped.
     -o,--out               STR         The output file basename.
                                             Default stdout.
     """)
@@ -41,16 +44,16 @@ Options:
 def get_args():
     # Parse them all as strings and check them later.
     parser = argparse.ArgumentParser()
-    parser.add_argument('-k', '--dimension', nargs=1, type=str)
-    parser.add_argument('-g', '--garud', nargs=1, type=str)
-    parser.add_argument('-e', '--ihs', type=bool)
-    parser.add_argument('-u', '--unphased', type=bool)
-    parser.add_argument('-f', '--fuzzy', type=bool)
-    parser.add_argument('-l', '--long', type=bool)
-    parser.add_argument('-t', '--threads', nargs=1, type=str)
-    parser.add_argument('-m', '--MAF', type=str)
-    parser.add_argument('-n', '--afMissing', nargs=1, type=str)
-    parser.add_argument('-o', '--out', nargs=1, type=str)
+    parser.add_argument('-k', '--dimension', nargs=1, type=str, default='2')
+    parser.add_argument('-g', '--garud', nargs=1, type=str, default='40000')
+    parser.add_argument('-e', '--ihs', type=bool, default=False)
+    parser.add_argument('-u', '--unphased', type=bool, default=False)
+    parser.add_argument('-f', '--fuzzy', type=bool, default=False)
+    parser.add_argument('-l', '--long', type=bool, default=False)
+    parser.add_argument('-t', '--threads', nargs=1, type=str, default='1')
+    parser.add_argument('-m', '--MAF', type=str, default='0')
+    parser.add_argument('-n', '--afMissing', nargs=1, type=str, default='1')
+    parser.add_argument('-o', '--out', nargs=1, type=str, default='')
     # The input files.
     parser.add_argument('steps', nargs="*")
     return parser.parse_args()
@@ -86,7 +89,7 @@ def check_args(args) -> bool:
         # Check step files exist.
         for filename in args.steps:
             if not os.path.isfile(filename):
-                print("Step files do not exist! Exiting ...")
+                print("Step file does not exist! Exiting ...")
                 return False
     
     # Catch any conversion errors.
@@ -110,10 +113,10 @@ def main() -> None:
 
     # Process each file.
     if int(args.threads) == 1:
-        steps = [calculate_stats((filename, args)) for filename in args.steps]
+        steps = [calc_stats((filename, args)) for filename in args.steps]
     else:
         with Pool(processes=int(args.threads)) as pool:
-            steps = pool.map(calculate_stats, zip(args.steps, len(args.steps) * [args]))
+            steps = pool.map(calc_stats, zip(args.steps, len(args.steps) * [args]))
 
 
 
