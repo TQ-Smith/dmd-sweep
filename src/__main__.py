@@ -3,7 +3,7 @@
 # File: __main__.py
 # Date: 20 July 2026
 # Author: T. Quinn Smith
-# Purpose: Main function for SOAP.
+# Purpose: Main function for dmd-sweep.
 
 import argparse
 import sys
@@ -13,11 +13,11 @@ import stats
 
 def print_help() -> None:
     print("""
-SOAP v1.0
+dmd-sweep v1.0
 -------------------------
 Written by T. Quinn Smith
 The Pennsylvania State University
-Usage: soap [options] <step1.vcf.gz> <step2.vcf.gz> ...
+Usage: dmd-sweep [options] <step1.vcf.gz> <step2.vcf.gz> ...
 
 Options:
     -k,--dimension         INT         Perform DMD in INT dimensions.
